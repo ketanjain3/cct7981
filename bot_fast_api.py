@@ -32,7 +32,7 @@ from google.adk.runners import InMemoryRunner
 from google.genai import types
 from google.adk.agents.llm_agent import Agent
 from pipecat_whisker import WhiskerObserver
-from streaming_bridge import create_streaming_queue, get_streaming_queue, clear_streaming_queue
+from streaming_bridge import register_task, unregister_task
 
 
 class AgentRunner:
@@ -40,29 +40,29 @@ class AgentRunner:
     async def run_streaming(
         query: str,
         root_agent: Agent,
-        queue_id: str
+        task_id: str
     ) -> str:
         """
-        Run ADK agent with streaming queue configured in session state.
+        Run ADK agent with task_id in session state.
 
         Args:
             query: User's question
             root_agent: ADK agent to run
-            queue_id: Unique queue ID for this invocation
+            task_id: Unique task ID for this invocation
 
         Returns:
             Final accumulated result text
         """
         runner = InMemoryRunner(agent=root_agent, app_name="my_app")
 
-        # Create session with queue_id in state
+        # Create session with task_id in state (primitive - survives deepcopy)
         session = await runner.session_service.create_session(
             app_name="my_app",
             user_id="test_user",
-            state={'streaming_queue_id': queue_id}  # KEY: Pass queue ID
+            state={'task_id': task_id}  # Pass task ID
         )
 
-        logger.info(f"Session {session.id[:8]} using queue {queue_id[:8]}")
+        logger.info(f"Session {session.id[:8]} using task {task_id[:8]}")
 
         result_text = ""
         async for event in runner.run_async(
@@ -118,7 +118,7 @@ Your job is to take the user's query and use the google_adk function to respond 
 async def google_adk(params: FunctionCallParams, query: str, task: PipelineTask):
     '''
     Use this tool to get the secret code with real-time TTS streaming.
-    Supports concurrent invocations with isolated queues.
+    Simplified - tool calls task.queue_frames() directly (no queue complexity).
 
     Args:
         params: Pipecat function call parameters
@@ -127,59 +127,25 @@ async def google_adk(params: FunctionCallParams, query: str, task: PipelineTask)
     '''
     logger.info(f"google_adk called with query: '{query}'")
 
-    # Step 1: Create unique queue for THIS invocation
-    queue_id = create_streaming_queue()
-    queue = get_streaming_queue(queue_id)
-    logger.info(f"Created queue {queue_id[:8]} for invocation")
+    # Step 1: Register task and get ID
+    task_id = register_task(task)
+    logger.info(f"Registered task {task_id[:8]}")
 
-    # Step 2: Start TTS monitor task (consumes from THIS queue only)
-    async def tts_monitor():
-        """Consume queue and speak via TTS with timeout protection."""
-        item_count = 0
-        while True:
-            try:
-                # Wait for next item with timeout
-                text = await asyncio.wait_for(queue.get(), timeout=30.0)
-
-                if text is None:  # Completion sentinel
-                    logger.info(f"Queue {queue_id[:8]} received completion signal after {item_count} items")
-                    break
-
-                # Queue TTS frame
-                logger.info(f"[Queue {queue_id[:8]}] Speaking: {text}")
-                await task.queue_frames([TTSSpeakFrame(text=text)])
-                item_count += 1
-
-            except asyncio.TimeoutError:
-                logger.warning(f"Queue {queue_id[:8]} timeout after {item_count} items")
-                break
-            except Exception as e:
-                logger.error(f"Queue {queue_id[:8]} error: {e}")
-                break
-
-    monitor_task = asyncio.create_task(tts_monitor())
-
-    # Step 3: Run ADK agent (tool will populate queue)
+    # Step 2: Run ADK agent (tool will call task directly)
     try:
-        result = await AgentRunner.run_streaming(query, root_agent, queue_id)
+        result = await AgentRunner.run_streaming(query, root_agent, task_id)
         logger.info(f"ADK returned: {result[:50]}...")
 
-        # Wait for TTS monitor to finish speaking all queued items
-        await asyncio.wait_for(monitor_task, timeout=60.0)
-
-        # Return final result to LLM context
+        # Return result to LLM
         await params.result_callback(result)
 
-    except asyncio.TimeoutError:
-        logger.error(f"Queue {queue_id[:8]} monitor timeout")
-        await params.result_callback("Error: Streaming timeout")
     except Exception as e:
-        logger.error(f"Queue {queue_id[:8]} error: {e}")
+        logger.error(f"Task {task_id[:8]} error: {e}")
         await params.result_callback(f"Error: {str(e)}")
     finally:
-        # Cleanup: Always remove queue from registry
-        clear_streaming_queue(queue_id)
-        logger.info(f"Cleaned up queue {queue_id[:8]}")
+        # Cleanup: Always remove task from registry
+        unregister_task(task_id)
+        logger.info(f"Unregistered task {task_id[:8]}")
 
 
 async def get_current_weather(params: FunctionCallParams, location: str, format: str):

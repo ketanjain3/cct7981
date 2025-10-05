@@ -1,125 +1,151 @@
 #!/usr/bin/env python3
 """
-Simple test to verify streaming bridge functionality.
+Simple test to verify simplified streaming bridge functionality.
 """
 import asyncio
 from streaming_bridge import (
-    create_streaming_queue,
-    get_streaming_queue,
-    clear_streaming_queue,
-    get_active_queue_count
+    register_task,
+    get_task,
+    unregister_task,
+    get_active_task_count
 )
 
 
-async def test_basic_queue_operations():
-    """Test basic queue creation, retrieval, and cleanup."""
-    print("Test 1: Basic Queue Operations")
+class MockTask:
+    """Mock PipelineTask for testing."""
+    def __init__(self, name):
+        self.name = name
+        self.frames_queued = []
 
-    # Create queue
-    queue_id = create_streaming_queue()
-    assert queue_id is not None, "Queue ID should not be None"
-    print(f"✓ Created queue: {queue_id[:8]}...")
+    async def queue_frames(self, frames):
+        """Mock queue_frames method."""
+        self.frames_queued.extend(frames)
+        print(f"  Task '{self.name}' queued {len(frames)} frame(s)")
 
-    # Retrieve queue
-    queue = get_streaming_queue(queue_id)
-    assert queue is not None, "Queue should be retrievable"
-    print(f"✓ Retrieved queue successfully")
+
+async def test_basic_task_operations():
+    """Test basic task registration, retrieval, and cleanup."""
+    print("Test 1: Basic Task Operations")
+
+    # Create mock task
+    mock_task = MockTask("test_task")
+
+    # Register task
+    task_id = register_task(mock_task)
+    assert task_id is not None, "Task ID should not be None"
+    print(f"✓ Registered task: {task_id[:8]}...")
+
+    # Retrieve task
+    retrieved_task = get_task(task_id)
+    assert retrieved_task is mock_task, "Should retrieve same task instance"
+    print(f"✓ Retrieved task successfully")
 
     # Check active count
-    assert get_active_queue_count() == 1, "Should have 1 active queue"
-    print(f"✓ Active queue count: {get_active_queue_count()}")
+    assert get_active_task_count() == 1, "Should have 1 active task"
+    print(f"✓ Active task count: {get_active_task_count()}")
 
-    # Clear queue
-    clear_streaming_queue(queue_id)
-    assert get_streaming_queue(queue_id) is None, "Queue should be cleared"
-    assert get_active_queue_count() == 0, "Should have 0 active queues"
-    print(f"✓ Cleared queue successfully\n")
+    # Unregister task
+    unregister_task(task_id)
+    assert get_task(task_id) is None, "Task should be unregistered"
+    assert get_active_task_count() == 0, "Should have 0 active tasks"
+    print(f"✓ Unregistered task successfully\n")
 
 
-async def test_queue_isolation():
-    """Test that multiple queues are isolated."""
-    print("Test 2: Queue Isolation")
+async def test_task_isolation():
+    """Test that multiple tasks are isolated."""
+    print("Test 2: Task Isolation")
 
-    # Create two queues
-    queue_id_a = create_streaming_queue()
-    queue_id_b = create_streaming_queue()
+    # Register two tasks
+    task_a = MockTask("Task A")
+    task_b = MockTask("Task B")
 
-    queue_a = get_streaming_queue(queue_id_a)
-    queue_b = get_streaming_queue(queue_id_b)
+    task_id_a = register_task(task_a)
+    task_id_b = register_task(task_b)
 
-    assert queue_a is not queue_b, "Queues should be different objects"
-    print(f"✓ Created two isolated queues: {queue_id_a[:8]}... and {queue_id_b[:8]}...")
+    retrieved_a = get_task(task_id_a)
+    retrieved_b = get_task(task_id_b)
 
-    # Put different items
-    await queue_a.put("Item A")
-    await queue_b.put("Item B")
+    assert retrieved_a is task_a, "Should retrieve Task A"
+    assert retrieved_b is task_b, "Should retrieve Task B"
+    assert retrieved_a is not retrieved_b, "Tasks should be different"
+    print(f"✓ Registered two isolated tasks: {task_id_a[:8]}... and {task_id_b[:8]}...")
 
-    # Retrieve from correct queues
-    item_a = await queue_a.get()
-    item_b = await queue_b.get()
+    # Simulate different operations on each
+    await task_a.queue_frames(["Frame A1", "Frame A2"])
+    await task_b.queue_frames(["Frame B1"])
 
-    assert item_a == "Item A", "Queue A should return Item A"
-    assert item_b == "Item B", "Queue B should return Item B"
-    print(f"✓ Queue isolation verified: A='{item_a}', B='{item_b}'")
+    assert len(task_a.frames_queued) == 2, "Task A should have 2 frames"
+    assert len(task_b.frames_queued) == 1, "Task B should have 1 frame"
+    print(f"✓ Task isolation verified: A has {len(task_a.frames_queued)} frames, B has {len(task_b.frames_queued)} frames")
 
     # Cleanup
-    clear_streaming_queue(queue_id_a)
-    clear_streaming_queue(queue_id_b)
-    print(f"✓ Cleaned up both queues\n")
+    unregister_task(task_id_a)
+    unregister_task(task_id_b)
+    print(f"✓ Cleaned up both tasks\n")
 
 
-async def test_queue_communication():
-    """Test producer-consumer pattern through queue."""
-    print("Test 3: Producer-Consumer Pattern")
+async def test_concurrent_task_usage():
+    """Test concurrent tool execution with isolated tasks."""
+    print("Test 3: Concurrent Tool Execution Pattern")
 
-    queue_id = create_streaming_queue()
-    queue = get_streaming_queue(queue_id)
+    # Simulate what happens when tool executes
+    async def simulate_tool_execution(task_id, tool_name):
+        """Simulate streaming tool execution."""
+        task = get_task(task_id)
+        if not task:
+            print(f"  {tool_name}: Error - task not found!")
+            return
 
-    # Producer task
-    async def producer():
+        print(f"  {tool_name}: Starting execution")
         for i in range(3):
-            await asyncio.sleep(0.1)
-            await queue.put(f"Message {i+1}")
-            print(f"  Producer: Sent 'Message {i+1}'")
-        await queue.put(None)  # Sentinel
-        print(f"  Producer: Sent completion signal")
+            await asyncio.sleep(0.05)  # Simulate work
+            frame_text = f"{tool_name} - Item {i+1}"
+            await task.queue_frames([frame_text])
+        print(f"  {tool_name}: Complete")
 
-    # Consumer task
-    async def consumer():
-        messages = []
-        while True:
-            msg = await queue.get()
-            if msg is None:
-                print(f"  Consumer: Received completion signal")
-                break
-            messages.append(msg)
-            print(f"  Consumer: Received '{msg}'")
-        return messages
+    # Register tasks for two concurrent "users"
+    task_user_a = MockTask("User A")
+    task_user_b = MockTask("User B")
 
-    # Run both concurrently
-    producer_task = asyncio.create_task(producer())
-    consumer_task = asyncio.create_task(consumer())
+    id_a = register_task(task_user_a)
+    id_b = register_task(task_user_b)
 
-    await producer_task
-    messages = await consumer_task
+    print(f"  Registered tasks for User A ({id_a[:8]}) and User B ({id_b[:8]})")
 
-    assert len(messages) == 3, "Should receive 3 messages"
-    assert messages == ["Message 1", "Message 2", "Message 3"], "Messages should match"
-    print(f"✓ Producer-consumer pattern works correctly\n")
+    # Run tools concurrently
+    await asyncio.gather(
+        simulate_tool_execution(id_a, "Tool A"),
+        simulate_tool_execution(id_b, "Tool B")
+    )
 
-    clear_streaming_queue(queue_id)
+    # Verify isolation
+    assert len(task_user_a.frames_queued) == 3, "User A should have 3 frames"
+    assert len(task_user_b.frames_queued) == 3, "User B should have 3 frames"
+
+    # Verify no cross-contamination
+    a_frames = [f for f in task_user_a.frames_queued if "Tool A" in f]
+    b_frames = [f for f in task_user_b.frames_queued if "Tool B" in f]
+
+    assert len(a_frames) == 3, "User A should only have Tool A frames"
+    assert len(b_frames) == 3, "User B should only have Tool B frames"
+    print(f"✓ Concurrent execution verified: No cross-contamination")
+
+    # Cleanup
+    unregister_task(id_a)
+    unregister_task(id_b)
+    print(f"✓ Cleaned up both tasks\n")
 
 
 async def main():
     """Run all tests."""
     print("=" * 60)
-    print("STREAMING BRIDGE TESTS")
+    print("SIMPLIFIED STREAMING BRIDGE TESTS")
     print("=" * 60 + "\n")
 
     try:
-        await test_basic_queue_operations()
-        await test_queue_isolation()
-        await test_queue_communication()
+        await test_basic_task_operations()
+        await test_task_isolation()
+        await test_concurrent_task_usage()
 
         print("=" * 60)
         print("✅ ALL TESTS PASSED!")

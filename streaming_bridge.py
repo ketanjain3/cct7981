@@ -1,81 +1,58 @@
 """
-Thread-safe bridge for streaming communication between Google ADK and Pipecat.
-Supports concurrent invocations with isolated per-session queues.
+Simple task registry for ADK-Pipecat integration.
+Allows ADK tools to call Pipecat task methods directly.
 """
-import asyncio
 import uuid
 from typing import Optional, Dict
-import time
 from loguru import logger
 
-# Global registry of queues (keyed by unique ID)
-_queues: Dict[str, Dict[str, any]] = {}
-_cleanup_interval = 300  # 5 minutes
+# Global registry of tasks (keyed by unique ID)
+_tasks: Dict[str, any] = {}
 
 
-def create_streaming_queue() -> str:
+def register_task(task) -> str:
     """
-    Create a new streaming queue and return its unique ID.
-
-    Returns:
-        queue_id (str): Unique identifier to be stored in session state
-    """
-    queue_id = str(uuid.uuid4())
-    _queues[queue_id] = {
-        'queue': asyncio.Queue(),
-        'created_at': time.time()
-    }
-    logger.debug(f"Created streaming queue: {queue_id[:8]}...")
-    _cleanup_old_queues()
-    return queue_id
-
-
-def get_streaming_queue(queue_id: str) -> Optional[asyncio.Queue]:
-    """
-    Get queue by ID. Thread-safe retrieval.
+    Register a Pipecat task and return its unique ID.
 
     Args:
-        queue_id: Unique queue identifier
+        task: PipelineTask instance to register
 
     Returns:
-        asyncio.Queue or None if not found
+        str: Unique task ID to pass via session state
     """
-    entry = _queues.get(queue_id)
-    if entry:
-        return entry['queue']
-    logger.warning(f"Queue {queue_id[:8]}... not found")
-    return None
+    task_id = str(uuid.uuid4())
+    _tasks[task_id] = task
+    logger.debug(f"Registered task: {task_id[:8]}...")
+    return task_id
 
 
-def clear_streaming_queue(queue_id: str):
+def get_task(task_id: str):
     """
-    Remove queue by ID. Call after invocation completes.
+    Get task by ID.
 
     Args:
-        queue_id: Unique queue identifier
+        task_id: Unique task identifier
+
+    Returns:
+        PipelineTask or None if not found
     """
-    if _queues.pop(queue_id, None):
-        logger.debug(f"Cleared streaming queue: {queue_id[:8]}...")
+    task = _tasks.get(task_id)
+    if not task:
+        logger.warning(f"Task {task_id[:8]}... not found")
+    return task
 
 
-def _cleanup_old_queues():
+def unregister_task(task_id: str):
     """
-    Remove queues older than cleanup interval.
-    Prevents memory leaks from abandoned invocations.
+    Remove task by ID. Call after invocation completes.
+
+    Args:
+        task_id: Unique task identifier
     """
-    now = time.time()
-    to_remove = [
-        qid for qid, entry in _queues.items()
-        if now - entry['created_at'] > _cleanup_interval
-    ]
-    for qid in to_remove:
-        _queues.pop(qid, None)
-        logger.warning(f"Cleaned up stale queue: {qid[:8]}...")
-
-    if to_remove:
-        logger.info(f"Cleaned up {len(to_remove)} stale queues")
+    if _tasks.pop(task_id, None):
+        logger.debug(f"Unregistered task: {task_id[:8]}...")
 
 
-def get_active_queue_count() -> int:
-    """Get number of active queues (for monitoring)."""
-    return len(_queues)
+def get_active_task_count() -> int:
+    """Get number of registered tasks (for monitoring)."""
+    return len(_tasks)
