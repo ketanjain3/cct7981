@@ -1,29 +1,36 @@
-<prompt>
-<Role>
-You are an expert AI researcher and prompt engineer specializing in Large Language Models and AI agents. Your goal is to provide a comprehensive and actionable guide for a technical audience.
-</Role>
+Implement Intent Classification Agent Before Concierge Agent
 
-<Task>
-Research and explain in detail the most effective and latest prompting techniques for creating prompts for AI agents. Your explanation should be structured for clarity and practical application.
+  Create a new Intent Guardrail Agent that classifies user input before routing to the concierge agent. This agent acts as a gatekeeper to ensure     
+  conversations stay within supported scope.
 
-Follow these steps:
-1.  **Identify and Define Techniques:** Research and select at least five key prompting techniques that are highly relevant for guiding AI agents. For each technique, provide a clear definition and explain its purpose. Examples include Chain-of-Thought, Role-Playing, Zero-shot/Few-shot prompting, and using structured formats like XML.
-2.  **Claude 4.5 Specific Tips:** Research and list specific tips and best practices for prompting the Claude 4.5 model. Highlight techniques that are particularly effective for this model, such as the use of XML tags and providing explicit instructions.
-3.  **Synthesize and Apply:** Based on your research, draft a template for a highly effective prompt for an AI agent. This template should incorporate the best practices you've identified.
-4.  **Explain the Rationale:** Provide a clear, step-by-step explanation for why the structured prompt you've created is effective.
-</Task>
+  Requirements:
 
-<Context>
-The user wants to move beyond simple, conversational prompts to create more robust and efficient instructions for an AI agent. The final output should be a detailed guide that is both educational and practical.
-</Context>
+  1. Architecture:
+    - Position this agent before the concierge agent in the workflow
+    - Always call a tool (no direct responses)
+    - Store intent classification in state for downstream agents
+    - Reference implementation patterns from @/src/agent/agent/client_assist/core/agent.py and @/google/adk
+  2. Intent Classifications (4 types):
+    - greet - User greetings/pleasantries
+    - investment_related - Questions within Investment GPT RAG scope [define scope below]
+    - general_question - Generic questions answerable by the system
+    - out_of_scope - Questions inappropriate for a bank representative content assistant
+  3. State Management:
+    - Initialize state with intent field
+    - Agent updates state with classified intent
+    - Downstream agents (concierge, Investment GPT) read intent from state
+  4. Intent Scope Definitions:
 
-<Output_Format>
-Please structure your response using markdown. Use headings for each section (e.g., "Key Prompting Techniques", "Claude 4.5 Specific Tips", "Example Prompt Template"). Use bullet points or numbered lists to present information clearly.
-</Output_Format>
+  4. Investment Related:
+    - [Insert Investment GPT capabilities/scope description here]
 
-<Constraints>
-- Do not include overly technical jargon without explaining it.
-- Ensure the information is up-to-date and reflects the latest in prompt engineering.
-- The tone should be authoritative yet helpful.
-</Constraints>
-</prompt>
+  Out of Scope:
+    - Requests for actions/transactions (we only provide informational content)
+    - Questions unrelated to banking/finance
+    - Topics inappropriate for a bank's content-focused assistant
+
+  Context:
+  Our system wraps the Investment GPT RAG agent. This intent classifier ensures proper routing while maintaining the existing Investment GPT
+  functionality. The agent validates scope before passing requests downstream.
+
+  Key Point: This is a content delivery system (like "content GPTs") - information for consumption only, not transactional capabilities.
