@@ -1,21 +1,13 @@
-**Persona:** Act as a Senior Software Architect specializing in agentic AI systems and proficient in UML modeling.
+**Persona:** Act as a seasoned Software Architect specializing in integrating evaluation frameworks into existing systems.
 
-**Context:** I am researching and documenting the architecture of an existing agentic workflow system. I need a comprehensive analysis to understand its inner workings for potential improvements and maintenance. [Specify the name/purpose of the agentic system being analyzed here].
+**Context:** We have an existing software system [Specify the type of system - e.g., a web application, a data pipeline, a machine learning model] and are exploring the integration of Google’s ADK Eval Agent (as documented at https://google.github.io/adk-docs/evaluate/) to automate testing and evaluation.
 
-**Task:** Create a detailed architectural analysis of the current agentic flow, focusing on the interactions between its components.
+**Task:** Develop a detailed integration plan outlining the steps required to integrate the ADK Eval Agent with our existing system.
 
-**Input Data Specifics:** Assume the agentic flow involves [Specify the key components of the agentic flow - e.g., a planning module, an execution module, a memory module, external tools/APIs].  Focus on the flow of information and control *within* these components. [Add details about the specific technologies used if relevant - e.g., LangChain, AutoGPT, custom code].
+**Input Data Specifics:** The primary source of information for this plan is the documentation found at https://google.github.io/adk-docs/evaluate/.  [Specify any existing system documentation or architecture diagrams available].  Focus on practical implementation details, not just theoretical concepts.
 
-**Format/Output Constraints:**
-*   **UML Diagrams:** Include the following UML diagrams:
-    *   Sequence Diagrams: Illustrating the typical sequence of interactions for a common task. (At least 2 different task scenarios)
-    *   Activity Diagrams: Depicting the workflow and decision points within the agentic flow.
-    *   Communication Diagrams: Showing the message exchange between components.
-*   **Supporting Text:** Accompany each diagram with a concise textual explanation of what it illustrates.
-*   **Structure:** Organize the analysis into sections, one for each diagram type.
-*   **Tool:** Diagrams can be created using any standard UML modeling tool (e.g., Lucidchart, draw.io, PlantUML).  [Specify preferred diagramming tool if any].
-*   **Length:** Aim for a detailed but concise analysis, approximately 1500-2000 words total (including diagram explanations).
+**Format/Output Constraints:** Present the plan as a numbered, step-by-step guide. Each step should include: (1) a clear description of the action, (2) estimated effort (in hours/days), (3) potential challenges, and (4) required resources.  Include a section outlining the necessary infrastructure changes. Keep the plan concise and actionable – aim for approximately 500-700 words. Output as a markdown list.
 
-**Goal:** To provide a clear and comprehensive understanding of the agentic flow's architecture, facilitating further development and maintenance.
+**Goal:** To create a clear, actionable plan for successfully integrating the ADK Eval Agent into our system to improve automated testing and evaluation capabilities.
 
-[Consider adding 1-2 examples of a typical task the agent performs if needed to clarify the desired scope of the diagrams.]
+[Consider adding 1-2 examples of existing system components or testing procedures if needed to clarify the integration context.]
